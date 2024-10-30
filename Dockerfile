@@ -12,4 +12,6 @@ RUN pip install -r /requirements.txt
 
 ADD smartthings_exporter.py /smartthings_exporter.py
 
+EXPOSE 9090
+
 CMD [ "python", "/smartthings_exporter.py" ]
