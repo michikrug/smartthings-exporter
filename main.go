@@ -128,26 +128,31 @@ func (w *Worker) clearExpiredMetrics() {
 	}
 }
 
+// Check if all required environment variables are set
+func checkEnvVars(vars []string) {
+	for _, v := range vars {
+		if os.Getenv(v) == "" {
+			log.Fatalf("Missing required environment variable: %s", v)
+		}
+	}
+}
+
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
 	}
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	deviceID := os.Getenv("DEVICE_ID")
-	if deviceID == "" {
-		log.Fatal("DEVICE_ID is required")
-	}
+	// Required environment variables
+	requiredVars := []string{"SMARTTHINGS_TOKEN", "DEVICE_ID", "DEVICE_METRICS"}
+	checkEnvVars(requiredVars)
 
 	smartthingsToken := os.Getenv("SMARTTHINGS_TOKEN")
-	if smartthingsToken == "" {
-		log.Fatal("SMARTTHINGS_TOKEN is required")
-	}
+
+	deviceID := os.Getenv("DEVICE_ID")
 
 	deviceMetricsStr := os.Getenv("DEVICE_METRICS")
-	if deviceMetricsStr == "" {
-		log.Fatal("DEVICE_METRICS is required")
-	}
 	deviceMetrics := strings.Split(deviceMetricsStr, ",")
 
 	deviceName := os.Getenv("DEVICE_NAME")
