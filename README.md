@@ -19,9 +19,9 @@ SmartThings Exporter is a Prometheus exporter for SmartThings devices. It fetche
 ## Installation
 
 ```sh
-git clone https://github.com/yourusername/smartthings_exporter.git
-cd smartthings_exporter
-go build -o smartthings_exporter
+git clone https://github.com/michikrug/smartthings-exporter.git
+cd smartthings-exporter
+go build -o smartthings-exporter
 ```
 
 ## Configuration
@@ -41,14 +41,14 @@ EXPIRATION_THRESHOLD=300
 ### Running the Exporter
 
 ```sh
-./smartthings_exporter
+./smartthings-exporter
 ```
 
 ### Running with Docker
 
 ```sh
-docker build -t smartthings_exporter .
-docker run --env-file .env -p 9090:9090 smartthings_exporter
+docker build -t smartthings-exporter .
+docker run --env-file .env -p 9090:9090 smartthings-exporter
 ```
 
 ## Metrics
@@ -77,4 +77,4 @@ Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 ## Contact
 
-For questions, open an issue on [GitHub](https://github.com/michikrug/smartthings_exporter).
+For questions, open an issue on [GitHub](https://github.com/michikrug/smartthings-exporter).
