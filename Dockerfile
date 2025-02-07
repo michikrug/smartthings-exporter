@@ -1,17 +1,35 @@
-FROM python:3.12-alpine
+# 🏗 Stage 1: Build the Go binary
+FROM golang:1.23 AS builder
+
+WORKDIR /app
+
+# Copy go.mod and install dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code
+COPY main.go ./
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o exporter main.go
+
+# 🏗 Stage 2: Create a minimal runtime environment
+FROM alpine:latest
 
 LABEL org.opencontainers.image.authors="Michael Krug <michi.krug@gmail.com>"
 LABEL org.opencontainers.image.description="An implementation of a Prometheus exporter for SmartThings Devices"
 LABEL org.opencontainers.image.source=https://github.com/michikrug/smartthings_exporter
 LABEL org.opencontainers.image.licenses=GPL-3.0
 
-RUN apk update && apk add py3-pip
+# Install CA certificates (needed for HTTPS requests)
+RUN apk --no-cache add ca-certificates tzdata
 
-ADD requirements.txt /requirements.txt
-RUN pip install -r /requirements.txt
+WORKDIR /app
 
-ADD smartthings_exporter.py /smartthings_exporter.py
+# Copy the compiled Go binary from the builder stage
+COPY --from=builder /app/exporter .
 
-EXPOSE 9090
+USER nobody
 
-CMD [ "python", "/smartthings_exporter.py" ]
+# Run the bot
+ENTRYPOINT ["/app/exporter"]
