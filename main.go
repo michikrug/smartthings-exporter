@@ -36,21 +36,25 @@ type Worker struct {
 	smartthingsToken    string
 	deviceID            string
 	deviceName          string
-	deviceMetrics       []string
+	deviceMetrics       map[string]struct{}
 	metricsRegistry     *prometheus.Registry
 	metricsCollector    map[string]*Metric
 	collectingInterval  int
 	expirationThreshold int
 }
 
-func NewWorker(token, deviceID, deviceName string, metrics []string, interval, expiration int, registry *prometheus.Registry) *Worker {
+func NewWorker(token, deviceID, deviceName string, metrics []string, interval, expiration int) *Worker {
+	metricMap := make(map[string]struct{})
+	for _, m := range metrics {
+		metricMap[m] = struct{}{}
+	}
 	return &Worker{
 		client:              &http.Client{},
 		smartthingsToken:    token,
 		deviceID:            deviceID,
 		deviceName:          deviceName,
-		deviceMetrics:       metrics,
-		metricsRegistry:     registry,
+		deviceMetrics:       metricMap,
+		metricsRegistry:     prometheus.NewRegistry(),
 		metricsCollector:    make(map[string]*Metric),
 		collectingInterval:  interval,
 		expirationThreshold: expiration,
@@ -92,7 +96,7 @@ func (w *Worker) updateMetrics() {
 			for _, components := range data.Components {
 				for component, attributes := range components {
 					for attr, val := range attributes {
-						if contains(w.deviceMetrics, attr) {
+						if _, exists := w.deviceMetrics[attr]; exists {
 							if number, ok := val.Value.(float64); ok {
 								w.setMetric(attr, number)
 							} else {
@@ -134,16 +138,6 @@ func (w *Worker) clearExpiredMetrics() {
 			log.Printf("Cleared expired metric for device %s: %s", w.deviceName, key)
 		}
 	}
-}
-
-// contains checks if a given slice contains a specific item.
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
 }
 
 // Check if all required environment variables are set
@@ -201,11 +195,10 @@ func main() {
 		exporterPort = port
 	}
 
-	metricsRegistry := prometheus.NewRegistry()
-	worker := NewWorker(smartthingsToken, deviceID, deviceName, deviceMetrics, collectingInterval, expirationThreshold, metricsRegistry)
+	worker := NewWorker(smartthingsToken, deviceID, deviceName, deviceMetrics, collectingInterval, expirationThreshold)
 	go worker.updateMetrics()
 
-	http.Handle("/metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{}))
+	http.Handle("/metrics", promhttp.HandlerFor(worker.metricsRegistry, promhttp.HandlerOpts{}))
 	server := &http.Server{Addr: ":" + exporterPort}
 	go func() {
 		log.Printf("Starting HTTP server on port %s", exporterPort)
