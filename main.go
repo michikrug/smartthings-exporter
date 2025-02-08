@@ -28,7 +28,9 @@ type SmartThingsResponse struct {
 
 type Metric struct {
 	gauge      prometheus.Gauge
+	lastValue  float64
 	lastUpdate time.Time
+	expired    bool
 }
 
 type Worker struct {
@@ -114,8 +116,17 @@ func (w *Worker) updateMetrics() {
 
 func (w *Worker) setMetric(key string, value float64) {
 	if metric, exists := w.metricsCollector[key]; exists {
-		metric.gauge.Set(value)
-		metric.lastUpdate = time.Now()
+		// Only update the metric if the value has changed
+		if metric.lastValue != value {
+			if metric.expired {
+				w.metricsRegistry.MustRegister(metric.gauge) // Re-register expired metric
+				metric.expired = false
+				log.Printf("Re-registered expired metric: %s", key)
+			}
+			metric.gauge.Set(value)
+			metric.lastValue = value
+			metric.lastUpdate = time.Now()
+		}
 	} else {
 		gauge := prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:        fmt.Sprintf("smartthings_%s", key),
@@ -124,8 +135,8 @@ func (w *Worker) setMetric(key string, value float64) {
 		})
 		w.metricsRegistry.MustRegister(gauge)
 		gauge.Set(value)
-		w.metricsCollector[key] = &Metric{gauge: gauge, lastUpdate: time.Now()}
-		log.Printf("Registered new metric for device %s: %s", w.deviceName, key)
+		w.metricsCollector[key] = &Metric{gauge: gauge, lastValue: value, lastUpdate: time.Now(), expired: false}
+		log.Printf("Registered new metric: %s", key)
 	}
 }
 
@@ -133,9 +144,10 @@ func (w *Worker) clearExpiredMetrics() {
 	now := time.Now()
 	for key, metric := range w.metricsCollector {
 		if now.Sub(metric.lastUpdate).Seconds() > float64(w.expirationThreshold) {
-			w.metricsRegistry.Unregister(metric.gauge)
-			delete(w.metricsCollector, key)
-			log.Printf("Cleared expired metric for device %s: %s", w.deviceName, key)
+			w.metricsRegistry.Unregister(metric.gauge) // Remove metric from Prometheus
+			metric.expired = true
+			metric.lastUpdate = now
+			log.Printf("Marked metric as expired: %s", key)
 		}
 	}
 }

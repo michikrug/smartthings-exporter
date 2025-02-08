@@ -18,7 +18,7 @@ FROM alpine:latest
 
 LABEL org.opencontainers.image.authors="Michael Krug <michi.krug@gmail.com>"
 LABEL org.opencontainers.image.description="An implementation of a Prometheus exporter for SmartThings Devices"
-LABEL org.opencontainers.image.source=https://github.com/michikrug/smartthings_exporter
+LABEL org.opencontainers.image.source=https://github.com/michikrug/smartthings-exporter
 LABEL org.opencontainers.image.licenses=GPL-3.0
 
 # Install CA certificates (needed for HTTPS requests)

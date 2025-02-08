@@ -69,7 +69,7 @@ smartthings_temperature{device="LivingRoom"} 23.5
 
 ## License
 
-This project is licensed under the GNU General Public License (GPL). See the LICENSE file for details.
+This project is licensed under the GNU General Public License v3. See the [LICENSE](LICENSE) file for details.
 
 ## Contributions
 
