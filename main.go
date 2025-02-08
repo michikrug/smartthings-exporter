@@ -162,8 +162,6 @@ func checkEnvVars(vars []string) {
 }
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, relying on environment variables")
 	}
