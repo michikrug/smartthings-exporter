@@ -19,10 +19,10 @@ import (
 )
 
 type SmartThingsResponse struct {
-	Components struct {
-		Main struct {
-			Status map[string]interface{} `json:"status"`
-		} `json:"main"`
+	Components map[string]map[string]map[string]struct {
+		Value     interface{} `json:"value"`
+		Unit      string      `json:"unit,omitempty"`
+		Timestamp string      `json:"timestamp,omitempty"`
 	} `json:"components"`
 }
 
@@ -89,10 +89,16 @@ func (w *Worker) updateMetrics() {
 		if err != nil {
 			log.Println("Error fetching data:", err)
 		} else {
-			for _, key := range w.deviceMetrics {
-				if value, ok := data.Components.Main.Status[key]; ok {
-					if numValue, ok := value.(float64); ok {
-						w.setMetric(key, numValue)
+			for _, components := range data.Components {
+				for component, attributes := range components {
+					for attr, val := range attributes {
+						if contains(w.deviceMetrics, attr) {
+							if number, ok := val.Value.(float64); ok {
+								w.setMetric(attr, number)
+							} else {
+								log.Printf("Component %s: unable to cast attribute %s to float64", component, attr)
+							}
+						}
 					}
 				}
 			}
@@ -108,12 +114,14 @@ func (w *Worker) setMetric(key string, value float64) {
 		metric.lastUpdate = time.Now()
 	} else {
 		gauge := prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: fmt.Sprintf("smartthings_%s", key),
-			Help: fmt.Sprintf("Metric from SmartThings API: %s", key),
+			Name:        fmt.Sprintf("smartthings_%s", key),
+			Help:        fmt.Sprintf("Metric from SmartThings API: %s.%s", w.deviceName, key),
+			ConstLabels: prometheus.Labels{"device": w.deviceName},
 		})
 		w.metricsRegistry.MustRegister(gauge)
 		gauge.Set(value)
 		w.metricsCollector[key] = &Metric{gauge: gauge, lastUpdate: time.Now()}
+		log.Printf("Registered new metric for device %s: %s", w.deviceName, key)
 	}
 }
 
@@ -123,9 +131,19 @@ func (w *Worker) clearExpiredMetrics() {
 		if now.Sub(metric.lastUpdate).Seconds() > float64(w.expirationThreshold) {
 			w.metricsRegistry.Unregister(metric.gauge)
 			delete(w.metricsCollector, key)
-			log.Printf("Cleared expired metric: %s", key)
+			log.Printf("Cleared expired metric for device %s: %s", w.deviceName, key)
 		}
 	}
+}
+
+// contains checks if a given slice contains a specific item.
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
 
 // Check if all required environment variables are set
