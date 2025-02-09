@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -41,11 +40,11 @@ type Worker struct {
 	deviceMetrics       map[string]struct{}
 	metricsRegistry     *prometheus.Registry
 	metricsCollector    map[string]*Metric
-	collectingInterval  int
-	expirationThreshold int
+	collectingInterval  time.Duration
+	expirationThreshold time.Duration
 }
 
-func NewWorker(token, deviceID, deviceName string, metrics []string, interval, expiration int) *Worker {
+func NewWorker(token, deviceID, deviceName string, metrics []string, interval, expiration time.Duration) *Worker {
 	metricMap := make(map[string]struct{})
 	for _, m := range metrics {
 		metricMap[m] = struct{}{}
@@ -110,7 +109,7 @@ func (w *Worker) updateMetrics() {
 			}
 		}
 		w.clearExpiredMetrics()
-		time.Sleep(time.Duration(w.collectingInterval) * time.Second)
+		time.Sleep(w.collectingInterval)
 	}
 }
 
@@ -143,7 +142,7 @@ func (w *Worker) setMetric(key string, value float64) {
 func (w *Worker) clearExpiredMetrics() {
 	now := time.Now()
 	for key, metric := range w.metricsCollector {
-		if now.Sub(metric.lastUpdate).Seconds() > float64(w.expirationThreshold) {
+		if now.Sub(metric.lastUpdate) > w.expirationThreshold && !metric.expired {
 			w.metricsRegistry.Unregister(metric.gauge) // Remove metric from Prometheus
 			metric.expired = true
 			metric.lastUpdate = now
@@ -182,21 +181,21 @@ func main() {
 		deviceName = deviceID
 	}
 
-	collectingInterval := 30
-	if interval, exists := os.LookupEnv("COLLECTING_INTERVAL"); exists {
-		if i, err := strconv.Atoi(interval); err == nil {
-			collectingInterval = i
+	collectingInterval := 30 * time.Second
+	if intervalStr, exists := os.LookupEnv("COLLECTING_INTERVAL"); exists {
+		if interval, err := time.ParseDuration(intervalStr); err == nil {
+			collectingInterval = interval
 		} else {
-			log.Printf("Invalid COLLECTING_INTERVAL: %s", interval)
+			log.Printf("Invalid COLLECTING_INTERVAL: %s (expected duration string, e.g., 30s, 1m, 2h): %v", intervalStr, err)
 		}
 	}
 
-	expirationThreshold := 900
-	if threshold, exists := os.LookupEnv("EXPIRATION_THRESHOLD"); exists {
-		if t, err := strconv.Atoi(threshold); err == nil {
-			expirationThreshold = t
+	expirationThreshold := 15 * time.Minute
+	if thresholdStr, exists := os.LookupEnv("EXPIRATION_THRESHOLD"); exists {
+		if threshold, err := time.ParseDuration(thresholdStr); err == nil {
+			expirationThreshold = threshold
 		} else {
-			log.Printf("Invalid EXPIRATION_THRESHOLD: %s", threshold)
+			log.Printf("Invalid EXPIRATION_THRESHOLD: %s (expected duration string, e.g., 30s, 1m, 2h): %v", thresholdStr, err)
 		}
 	}
 
