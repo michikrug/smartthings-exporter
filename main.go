@@ -209,13 +209,15 @@ func main() {
 
 	http.Handle("/metrics", promhttp.HandlerFor(worker.metricsRegistry, promhttp.HandlerOpts{}))
 	server := &http.Server{Addr: ":" + exporterPort}
+
 	go func() {
 		log.Printf("Starting HTTP server on port %s", exporterPort)
-		if err := server.ListenAndServe(); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server failed: %s", err)
 		}
 	}()
 
+	// Graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
@@ -223,7 +225,9 @@ func main() {
 	log.Println("Shutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("Server shutdown failed: %s", err)
 	}
+	log.Println("Server gracefully shut down")
 }
