@@ -101,7 +101,7 @@ func (w *Worker) updateMetrics() {
 							if number, ok := val.Value.(float64); ok {
 								w.setMetric(attr, number)
 							} else {
-								log.Printf("Component %s: unable to cast attribute %s to float64", component, attr)
+								log.Printf("Component %s: unable to cast attribute %s to float64, value: %v", component, attr, val.Value)
 							}
 						}
 					}
